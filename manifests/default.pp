@@ -262,12 +262,20 @@ file{ '/etc/kafka/c3_jaas.conf':
     principal=\"${kafkaclient_principal}\";
 };
 
+KafkaServer {
+  com.sun.security.auth.module.Krb5LoginModule required
+  useKeyTab=true
+  storeKey=true
+  keyTab=\"${kafka_keytab}\"
+  principal=\"${kafka_principal}\";
+};
+
 Client {
-    com.sun.security.auth.module.Krb5LoginModule required
-    useKeyTab=true
-    storeKey=true
-    keyTab=\"${kafka_keytab}\"
-    principal=\"${kafka_principal}\";
+  com.sun.security.auth.module.Krb5LoginModule required
+  useKeyTab=true
+  storeKey=true
+  keyTab=\"${kafka_keytab}\"
+  principal=\"${kafka_principal}\";
 };
 "
 } ->
@@ -311,9 +319,9 @@ export KAFKA_OPTS='-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaa
 file{'/usr/sbin/start-c3':
   ensure  => present,
   mode    => '0755',
-  content => "export KAFKA_HEAP_OPTS='-Xmx256M'
+  content => "export CONTROL_CENTER_HEAP_OPTS='-Xmx256M'
 
-export KAFKA_OPTS='-Djava.security.auth.login.config=/etc/kafka/c3_jaas.conf'
+export CONTROL_CENTER_OPTS='-Djava.security.auth.login.config=/etc/kafka/c3_jaas.conf'
 /usr/bin/control-center-start /etc/confluent-control-center/control-center.properties &
 "
 } ->
@@ -399,6 +407,7 @@ confluent.controlcenter.data.dir=/tmp/confluent/control-center
 zookeeper.connect=${::fqdn}:2181
 confluent.controlcenter.rest.port=9021
 confluent.controlcenter.internal.topics.replication=1
+confluent.monitoring.interceptor.topic.replication=1
 confluent.controlcenter.streams.ssl.keystore.location=$client_keystore
 confluent.controlcenter.streams.ssl.keystore.password=$password
 confluent.controlcenter.streams.ssl.key.password=$password
@@ -408,6 +417,7 @@ confluent.controlcenter.streams.ssl.client.auth=required
 confluent.controlcenter.streams.security.protocol=SASL_SSL
 confluent.controlcenter.streams.sasl.mechanism=GSSAPI
 confluent.controlcenter.streams.sasl.kerberos.service.name=kafka
+bootstrap.servers=${::fqdn}:${ssl_port}
 "
 } ->
 class{'::motd':
