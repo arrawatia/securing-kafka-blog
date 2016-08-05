@@ -7,7 +7,6 @@
 # puppet module install saz-ssh
 
 $packages = [
-  'confluent-kafka-2.11',
   'git',
   'java-1.8.0-openjdk-headless',
   'java-1.8.0-openjdk-devel',
@@ -78,6 +77,12 @@ yumrepo{'confluent':
 } ->
 package{$packages:
   ensure => 'installed'
+} ->
+exec{'install 3.0.1':
+  command => "wget -qO- https://s3-us-west-2.amazonaws.com/staging-confluent-packages-3.0.1/archive/3.0/confluent-3.0.1-2.11-rpm.tar.gz | tar xvz -C /tmp && sudo /tmp/confluent-3.0.1/install.sh || exit 0;"
+} ->
+exec{'install 3.0.1 Control center':
+  command => "sudo rpm -ivh /tmp/confluent-3.0.1/confluent-control-center-3.0.1-1.noarch.rpm || exit 0;"
 } ->
 service{'haveged':
   ensure => 'running',
@@ -247,6 +252,25 @@ file{ '/etc/kafka/kafka_client_jaas.conf':
 };
 "
 } ->
+file{ '/etc/kafka/c3_jaas.conf':
+  ensure  => present,
+  content => "KafkaClient {
+    com.sun.security.auth.module.Krb5LoginModule required
+    useKeyTab=true
+    storeKey=true
+    keyTab=\"${kafkaclient_keytab}\"
+    principal=\"${kafkaclient_principal}\";
+};
+
+Client {
+    com.sun.security.auth.module.Krb5LoginModule required
+    useKeyTab=true
+    storeKey=true
+    keyTab=\"${kafka_keytab}\"
+    principal=\"${kafka_principal}\";
+};
+"
+} ->
 file{'/etc/kafka/zookeeper_jaas.conf':
   ensure  => present,
   content => "Server {
@@ -281,6 +305,16 @@ export KAFKA_OPTS='-Djava.security.auth.login.config=/etc/kafka/zookeeper_jaas.c
 sleep 5
 export KAFKA_OPTS='-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf'
 /usr/bin/kafka-server-start /etc/kafka/server.properties &
+"
+} ->
+
+file{'/usr/sbin/start-c3':
+  ensure  => present,
+  mode    => '0755',
+  content => "export KAFKA_HEAP_OPTS='-Xmx256M'
+
+export KAFKA_OPTS='-Djava.security.auth.login.config=/etc/kafka/c3_jaas.conf'
+/usr/bin/control-center-start /etc/confluent-control-center/control-center.properties &
 "
 } ->
 file{'/etc/kafka/server.properties':
@@ -354,6 +388,26 @@ ssl.truststore.password=$password
 ssl.keystore.location=$client_keystore
 ssl.keystore.password=$password
 ssl.key.password=$password
+"
+} ->
+
+file{'/etc/confluent-control-center/control-center.properties':
+  ensure  => present,
+  content => "#Managed by puppet. Save changes to a different file.
+confluent.controlcenter.id=1
+confluent.controlcenter.data.dir=/tmp/confluent/control-center
+zookeeper.connect=${::fqdn}:2181
+confluent.controlcenter.rest.port=9021
+confluent.controlcenter.internal.topics.replication=1
+confluent.controlcenter.streams.ssl.keystore.location=$client_keystore
+confluent.controlcenter.streams.ssl.keystore.password=$password
+confluent.controlcenter.streams.ssl.key.password=$password
+confluent.controlcenter.streams.ssl.truststore.location=$client_truststore
+confluent.controlcenter.streams.ssl.truststore.password=$password
+confluent.controlcenter.streams.ssl.client.auth=required
+confluent.controlcenter.streams.security.protocol=SASL_SSL
+confluent.controlcenter.streams.sasl.mechanism=GSSAPI
+confluent.controlcenter.streams.sasl.kerberos.service.name=kafka
 "
 } ->
 class{'::motd':
