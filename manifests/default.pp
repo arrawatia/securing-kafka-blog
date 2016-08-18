@@ -399,6 +399,48 @@ ssl.key.password=$password
 "
 } ->
 
+file{'/etc/kafka/c3-sasl-producer.properties':
+  ensure  => present,
+  content => "#Managed by puppet. Save changes to a different file.
+bootstrap.servers=${::fqdn}:${sasl_port}
+security.protocol=SASL_SSL
+sasl.kerberos.service.name=kafka
+ssl.truststore.location=$client_truststore
+ssl.truststore.password=$password
+ssl.keystore.location=$client_keystore
+ssl.keystore.password=$password
+ssl.key.password=$password
+interceptor.classes=io.confluent.monitoring.clients.interceptor.MonitoringProducerInterceptor
+acks=all
+confluent.monitoring.interceptor.security.protocol=SASL_SSL
+confluent.monitoring.interceptor.sasl.kerberos.service.name=kafka
+confluent.monitoring.interceptor.ssl.truststore.location=$client_truststore
+confluent.monitoring.interceptor.ssl.truststore.password=$password
+confluent.monitoring.interceptor.ssl.keystore.location=/etc/security/tls/kafka.client.keystore.jks
+confluent.monitoring.interceptor.ssl.keystore.password=$password
+confluent.monitoring.interceptor.ssl.key.password=$password
+"
+} ->
+
+file{'/etc/kafka/c3-sasl-consumer.properties':
+  ensure  => present,
+  content => "#Managed by puppet. Save changes to a different file.
+  bootstrap.servers=${::fqdn}:${sasl_port}
+  group.id=securing-kafka-group
+  security.protocol=SASL_SSL
+  sasl.kerberos.service.name=kafka
+  ssl.truststore.location=$client_truststore
+  ssl.truststore.password=$password
+
+  interceptor.classes=io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
+  confluent.monitoring.interceptor.security.protocol=SASL_SSL
+  confluent.monitoring.interceptor.sasl.kerberos.service.name=kafka
+  confluent.monitoring.interceptor.ssl.truststore.location=$client_truststore
+  confluent.monitoring.interceptor.ssl.truststore.password=$password
+"
+} ->
+
+
 file{'/etc/confluent-control-center/control-center.properties':
   ensure  => present,
   content => "#Managed by puppet. Save changes to a different file.
@@ -417,7 +459,7 @@ confluent.controlcenter.streams.ssl.client.auth=required
 confluent.controlcenter.streams.security.protocol=SASL_SSL
 confluent.controlcenter.streams.sasl.mechanism=GSSAPI
 confluent.controlcenter.streams.sasl.kerberos.service.name=kafka
-bootstrap.servers=${::fqdn}:${ssl_port}
+bootstrap.servers=${::fqdn}:${sasl_port}
 "
 } ->
 class{'::motd':

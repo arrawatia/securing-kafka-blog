@@ -1,0 +1,27 @@
+1. Start kafka
+sudo /usr/sbin/start-zk-and-kafka
+
+2. Set ACLs
+export CONTROL_CENTER_OPTS='-Djava.security.auth.login.config=/etc/kafka/c3_jaas.conf'
+control-center-set-acls /etc/confluent-control-center/control-center.properties
+
+3. Start C3
+sudo /usr/sbin/start-c3
+
+4. Read and write some data
+
+export KAFKA_OPTS="-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf"
+kafka-topics --create --topic securing-c3  --replication-factor 1  --partitions 3  --zookeeper kafka.example.com:2181
+
+kafka-acls --authorizer-properties zookeeper.connect=kafka.example.com:2181 --add --allow-principal User:kafkaclient --producer --topic securing-c3
+kafka-acls --authorizer-properties zookeeper.connect=kafka.example.com:2181 --add --allow-principal User:kafkaclient --consumer --group securing-kafka-group --topic securing-c3
+
+
+
+
+seq 10000 > /tmp/msgs
+
+export CONTROL_CENTER_OPTS='-Djava.security.auth.login.config=/etc/kafka/c3_jaas.conf'
+control-center-run-class kafka.tools.ConsoleProducer --broker-list kafka.example.com:9095 --topic securing-c3 --producer.config /etc/kafka/c3-sasl-producer.properties < /tmp/msgs
+
+control-center-run-class kafka.tools.ConsoleConsumer --bootstrap-server kafka.example.com:9095 --topic securing-c3 --new-consumer --from-beginning --max-messages 10000 --consumer.config /etc/kafka/c3-sasl-consumer.properties
